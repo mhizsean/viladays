@@ -12,14 +12,15 @@ class EventCreate(BaseModel):
     start_datetime: datetime
     end_datetime: datetime
 
-    class EventUpdate(BaseModel):
-        title: str | None = None
-        description: str | None = None
-        category: EventCategory | None = None
-        location: str | None = None
-        image_url: str | None = None
-        start_datetime: datetime | None = None
-        end_datetime: datetime | None = None
+
+class EventUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    category: EventCategory | None = None
+    location: str | None = None
+    image_url: str | None = None
+    start_datetime: datetime | None = None
+    end_datetime: datetime | None = None
 
 
 class EventResponse(BaseModel):
