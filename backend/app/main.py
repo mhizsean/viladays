@@ -1,10 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth
+from fastapi.security import HTTPBearer
+from app.routers import auth, event
 
+security = HTTPBearer()
 
-app = FastAPI(title="Viladays API",
-              description="Itinary planner API", version="1.0.0")
+app = FastAPI(
+    title="Viladays API",
+    description="Itinary planner API",
+    version="1.0.0",
+    swagger_ui_parameters={"persistAuthorization": True},
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(event.router)
 
 
 @app.get("/")

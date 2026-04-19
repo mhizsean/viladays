@@ -33,6 +33,7 @@ class EventResponse(BaseModel):
     start_datetime: datetime | None = None
     end_datetime: datetime | None = None
     created_at: datetime
+    updated_at: datetime
 
     model_config = {
         "from_attributes": True
