@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Enum
+from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
 
@@ -19,3 +20,6 @@ class User(Base):
     last_name = Column(String, nullable=False)
     country = Column(String, nullable=True)
     phone_number = Column(String, nullable=True)
+
+    itineraries = relationship(
+        "Itinerary", back_populates="user", cascade="all, delete-orphan")
