@@ -12,7 +12,7 @@ export const register = async (data: RegisterRequest): Promise<User> => {
     return response.data;
 }
 
-export const getCurrentUser = async (): Promise<User> => {
+export const getMe = async (): Promise<User> => {
     const response = await client.get<User>("/auth/me");
     return response.data;
 }
