@@ -36,8 +36,6 @@ def register_user(db: Session, data: RegisterRequest) -> User:
         hashed_password=hash_password(data.password),
         first_name=data.first_name,
         last_name=data.last_name,
-        country=data.country,
-        phone_number=data.phone_number,
     )
     db.add(user)
     db.commit()
