@@ -25,3 +25,6 @@ dist-ssr
 
 .env
 .env.local
+
+# Tailwind CLI watch artifact (app uses Vite + @tailwindcss/vite; do not import this file)
+src/output.css

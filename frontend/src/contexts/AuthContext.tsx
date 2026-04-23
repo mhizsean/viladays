@@ -21,19 +21,20 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(
+  const [token, setTokenState] = useState<string | null>(
     localStorage.getItem("token"),
   );
   const [isLoading, setIsLoading] = useState(false);
 
-  const setTokenState = (newToken: string) => {
+  const setToken = (newToken: string) => {
     localStorage.setItem("token", newToken);
-    setToken(newToken);
+    setTokenState(newToken);
+    setIsLoading(true);
   };
 
   const logout = () => {
     localStorage.removeItem("token");
-    setToken(null);
+    setTokenState(null);
     setUser(null);
   };
 
@@ -64,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         token,
         isLoading,
         isAdmin,
-        setToken: setTokenState,
+        setToken,
         logout,
       }}
     >
