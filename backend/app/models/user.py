@@ -18,8 +18,6 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.user, nullable=False)
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
-    country = Column(String, nullable=True)
-    phone_number = Column(String, nullable=True)
 
     itineraries = relationship(
         "Itinerary", back_populates="user", cascade="all, delete-orphan")

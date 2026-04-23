@@ -22,6 +22,12 @@ export interface RegisterRequest {
   phone_number?: string
 }
 
+/** Controlled fields for the register form (subset of {@link RegisterRequest}). */
+export type RegisterFormFields = Pick<
+  RegisterRequest,
+  "email" | "password" | "first_name" | "last_name"
+>
+
 export interface LoginRequest {
   email: string
   password: string

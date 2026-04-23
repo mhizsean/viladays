@@ -7,8 +7,6 @@ class RegisterRequest(BaseModel):
     password: str
     first_name: str
     last_name: str
-    country: str | None = None
-    phone_number: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -21,8 +19,6 @@ class UserResponse(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
-    country: str | None = None
-    phone_number: str | None = None
     role: UserRole
 
     model_config = {

@@ -2,22 +2,25 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { register } from "../api/auth";
 import { FormTextField } from "../components/FormTextField";
+import type { RegisterFormFields } from "../types/auth";
+
+const REGISTER_FORM_INITIAL: RegisterFormFields = {
+  email: "",
+  password: "",
+  first_name: "",
+  last_name: "",
+};
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-    first_name: "",
-    last_name: "",
-    country: "",
-    phone_number: "",
-  });
+  const [form, setForm] = useState<RegisterFormFields>(REGISTER_FORM_INITIAL);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    const key = name as keyof RegisterFormFields;
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -85,22 +88,6 @@ export const RegisterPage = () => {
             value={form.password}
             onChange={handleChange}
             required
-          />
-          <FormTextField
-            label="Country"
-            type="text"
-            name="country"
-            autoComplete="country-name"
-            value={form.country}
-            onChange={handleChange}
-          />
-          <FormTextField
-            label="Phone number"
-            type="tel"
-            name="phone_number"
-            autoComplete="tel"
-            value={form.phone_number}
-            onChange={handleChange}
           />
           <button
             type="submit"
