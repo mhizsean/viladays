@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import EventsPage from "./pages/EventsPage";
 
 function App() {
   return (
@@ -14,7 +15,7 @@ function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <div>Home page coming soon</div>
+              <EventsPage />
             </ProtectedRoute>
           }
         />
