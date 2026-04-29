@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getEvents } from "../api/events";
-import type { EventCategory } from "../types/event";
+import type { Event, EventCategory } from "../types/event";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { Button } from "../components/Button";
+import AddToPlanModal from "../components/AddToPlanModal";
 
 const categories: EventCategory[] = [
   "culture",
@@ -35,6 +36,7 @@ const EventsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<
     EventCategory | undefined
   >();
+  const [selectedEvent, setSelectedEvent] = useState<Event | undefined>();
 
   const {
     data: events,
@@ -119,11 +121,23 @@ const EventsPage = () => {
                     minute: "2-digit",
                   })}
                 </p>
-                <Button variant="outline" fullWidth text="+ Add to plan" />
+                <Button
+                  variant="outline"
+                  fullWidth
+                  text="+ Add to plan"
+                  onClick={() => setSelectedEvent(event)}
+                />
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {selectedEvent && (
+        <AddToPlanModal
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(undefined)}
+        />
       )}
     </div>
   );
