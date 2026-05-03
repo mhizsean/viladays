@@ -2,10 +2,11 @@ import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
-import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AdminRoute, ProtectedRoute } from "./components/ProtectedRoute";
 import EventsPage from "./pages/EventsPage";
 import ItineraryPage from "./pages/ItineraryPage";
 import { Layout } from "./components/Layout";
+import AdminPage from "./pages/AdminPage";
 
 const App = () => {
   return (
@@ -31,6 +32,17 @@ const App = () => {
                 <ItineraryPage />
               </Layout>
             </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <Layout>
+                <AdminPage />
+              </Layout>
+            </AdminRoute>
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
