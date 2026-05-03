@@ -34,6 +34,16 @@ const Navbar = () => {
           >
             My plan
           </Link>
+          <Link
+            to="/calendar"
+            className={
+              isActive("/calendar")
+                ? "text-gray-900 font-medium"
+                : "text-gray-400 hover:text-gray-600"
+            }
+          >
+            Calendar
+          </Link>
           {isAdmin && (
             <Link
               to="/admin"

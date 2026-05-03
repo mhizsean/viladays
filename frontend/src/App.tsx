@@ -7,6 +7,7 @@ import EventsPage from "./pages/EventsPage";
 import ItineraryPage from "./pages/ItineraryPage";
 import { Layout } from "./components/Layout";
 import AdminPage from "./pages/AdminPage";
+import CalendarPage from "./pages/CalendarPage";
 
 const App = () => {
   return (
@@ -34,7 +35,16 @@ const App = () => {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <CalendarPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin"
           element={
