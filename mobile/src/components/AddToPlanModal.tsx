@@ -1,7 +1,13 @@
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +30,48 @@ type Props = {
   onSuccess?: () => void;
 };
 
+type DatePickerField = "start" | "end";
+
+function formatYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseYmd(s: string): Date | null {
+  const t = s.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
+  const [y, m, d] = t.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (
+    dt.getFullYear() !== y ||
+    dt.getMonth() !== m - 1 ||
+    dt.getDate() !== d
+  ) {
+    return null;
+  }
+  return dt;
+}
+
+function formatDisplayYmd(ymd: string): string {
+  const d = parseYmd(ymd);
+  if (!d) return ymd;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/** Local noon → ISO to avoid UTC date shifts for calendar-only values. */
+function ymdToIsoMidday(ymd: string): string {
+  const d = parseYmd(ymd);
+  if (!d) return new Date(ymd).toISOString();
+  d.setHours(12, 0, 0, 0);
+  return d.toISOString();
+}
+
 export function AddToPlanModal({
   visible,
   event,
@@ -44,6 +92,31 @@ export function AddToPlanModal({
   const [success, setSuccess] = useState(false);
   const [pending, setPending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [keyboardInset, setKeyboardInset] = useState(0);
+  const [datePickerField, setDatePickerField] = useState<DatePickerField | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const showEvt =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const onShow = (e: { endCoordinates: { height: number } }) => {
+      setKeyboardInset(e.endCoordinates.height);
+    };
+    const onHide = () => setKeyboardInset(0);
+    const subShow = Keyboard.addListener(showEvt, onShow);
+    const subHide = Keyboard.addListener(hideEvt, onHide);
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!visible) setKeyboardInset(0);
+  }, [visible]);
 
   const reset = useCallback(() => {
     setView("select");
@@ -55,6 +128,7 @@ export function AddToPlanModal({
     setCreateFormError(null);
     setSuccess(false);
     setLoadError(null);
+    setDatePickerField(null);
   }, []);
 
   useEffect(() => {
@@ -108,11 +182,12 @@ export function AddToPlanModal({
     try {
       const created = await createItinerary({
         name: newPlanName.trim(),
-        start_date: new Date(newStartDate).toISOString(),
-        end_date: new Date(newEndDate).toISOString(),
+        start_date: ymdToIsoMidday(newStartDate),
+        end_date: ymdToIsoMidday(newEndDate),
       });
       setItineraries((prev) => [...prev, created]);
       setSelectedItineraryId(created.id);
+      setDatePickerField(null);
       setView("select");
     } catch {
       setCreateFormError("Could not create plan.");
@@ -123,6 +198,31 @@ export function AddToPlanModal({
 
   if (!event) return null;
 
+  const onDateChange = (
+    field: DatePickerField,
+    event: DateTimePickerEvent,
+    selectedDate?: Date,
+  ) => {
+    if (Platform.OS === "android") setDatePickerField(null);
+    if (event.type === "dismissed") {
+      setDatePickerField(null);
+      return;
+    }
+    if (!selectedDate) {
+      if (Platform.OS === "android") setDatePickerField(null);
+      return;
+    }
+    const ymd = formatYmd(selectedDate);
+    if (field === "start") {
+      setNewStartDate(ymd);
+      setNewEndDate((end) => (end && end < ymd ? ymd : end));
+    } else {
+      setNewEndDate(ymd);
+    }
+    setCreateFormError(null);
+    /* iOS inline/spinner: user taps “Done” to close; Android dialog closes itself. */
+  };
+
   return (
     <Modal
       visible={visible}
@@ -130,12 +230,29 @@ export function AddToPlanModal({
       transparent
       onRequestClose={handleClose}
     >
-      <Pressable style={styles.backdrop} onPress={handleClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.kav}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+      >
+        <Pressable style={styles.backdrop} onPress={handleClose}>
+          <Pressable
+            style={[
+              styles.sheet,
+              keyboardInset > 0 ? styles.sheetKeyboardOpen : null,
+            ]}
+            onPress={(e) => e.stopPropagation()}
           >
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator
+              nestedScrollEnabled
+              contentContainerStyle={[
+                styles.scrollContent,
+                { paddingBottom: 24 + keyboardInset },
+              ]}
+            >
             {success ? (
               <View style={styles.successBox}>
                 <Text style={styles.successEmoji}>✓</Text>
@@ -192,7 +309,10 @@ export function AddToPlanModal({
                 <View style={styles.row}>
                   <Pressable
                     style={styles.secondaryBtn}
-                    onPress={() => setView("create")}
+                    onPress={() => {
+                      setDatePickerField(null);
+                      setView("create");
+                    }}
                   >
                     <Text style={styles.secondaryBtnText}>+ New plan</Text>
                   </Pressable>
@@ -225,38 +345,81 @@ export function AddToPlanModal({
                   />
                 </View>
                 <View style={styles.field}>
-                  <Text style={styles.label}>Start (YYYY-MM-DD)</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={newStartDate}
-                    onChangeText={(t) => {
-                      setNewStartDate(t);
-                      setCreateFormError(null);
-                    }}
-                    placeholder="2026-06-01"
-                    autoCapitalize="none"
-                  />
+                  <Text style={styles.label}>Start date</Text>
+                  <Pressable
+                    style={styles.dateButton}
+                    onPress={() => setDatePickerField("start")}
+                  >
+                    <Text
+                      style={
+                        newStartDate ? styles.dateValue : styles.datePlaceholder
+                      }
+                    >
+                      {newStartDate
+                        ? formatDisplayYmd(newStartDate)
+                        : "Select start date"}
+                    </Text>
+                    <Text style={styles.dateChevron}>▼</Text>
+                  </Pressable>
+                  {datePickerField === "start" ? (
+                    <DateTimePicker
+                      value={parseYmd(newStartDate) ?? new Date()}
+                      mode="date"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      maximumDate={parseYmd(newEndDate) ?? undefined}
+                      onChange={(e, d) => onDateChange("start", e, d)}
+                    />
+                  ) : null}
                 </View>
                 <View style={styles.field}>
-                  <Text style={styles.label}>End (YYYY-MM-DD)</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={newEndDate}
-                    onChangeText={(t) => {
-                      setNewEndDate(t);
-                      setCreateFormError(null);
-                    }}
-                    placeholder="2026-06-05"
-                    autoCapitalize="none"
-                  />
+                  <Text style={styles.label}>End date</Text>
+                  <Pressable
+                    style={styles.dateButton}
+                    onPress={() => setDatePickerField("end")}
+                  >
+                    <Text
+                      style={
+                        newEndDate ? styles.dateValue : styles.datePlaceholder
+                      }
+                    >
+                      {newEndDate
+                        ? formatDisplayYmd(newEndDate)
+                        : "Select end date"}
+                    </Text>
+                    <Text style={styles.dateChevron}>▼</Text>
+                  </Pressable>
+                  {datePickerField === "end" ? (
+                    <DateTimePicker
+                      value={
+                        parseYmd(newEndDate) ??
+                        parseYmd(newStartDate) ??
+                        new Date()
+                      }
+                      mode="date"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      minimumDate={parseYmd(newStartDate) ?? undefined}
+                      onChange={(e, d) => onDateChange("end", e, d)}
+                    />
+                  ) : null}
                 </View>
+                {datePickerField !== null && Platform.OS === "ios" ? (
+                  <Pressable
+                    style={styles.dateDoneBtn}
+                    onPress={() => setDatePickerField(null)}
+                  >
+                    <Text style={styles.dateDoneText}>Done</Text>
+                  </Pressable>
+                ) : null}
                 {createFormError ? (
                   <Text style={styles.error}>{createFormError}</Text>
                 ) : null}
                 <View style={styles.row}>
                   <Pressable
                     style={styles.secondaryBtn}
-                    onPress={() => setView("select")}
+                    onPress={() => {
+                      setDatePickerField(null);
+                      setView("select");
+                    }}
                   >
                     <Text style={styles.secondaryBtnText}>Back</Text>
                   </Pressable>
@@ -276,14 +439,18 @@ export function AddToPlanModal({
             <Pressable style={styles.cancelWrap} onPress={handleClose}>
               <Text style={styles.cancel}>Cancel</Text>
             </Pressable>
-          </ScrollView>
+            </ScrollView>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  kav: {
+    flex: 1,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
@@ -295,8 +462,15 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 28,
+    paddingBottom: 8,
     maxHeight: "88%",
+  },
+  /** Leave room above the keyboard so the sheet does not fill under it. */
+  sheetKeyboardOpen: {
+    maxHeight: "72%",
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   title: {
     fontSize: 20,
@@ -340,6 +514,46 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
     color: "#111827",
+  },
+  dateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
+  },
+  dateValue: {
+    fontSize: 16,
+    color: "#111827",
+    fontWeight: "500",
+  },
+  datePlaceholder: {
+    fontSize: 16,
+    color: "#9ca3af",
+  },
+  dateChevron: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginLeft: 8,
+  },
+  dateDoneBtn: {
+    alignSelf: "stretch",
+    alignItems: "center",
+    paddingVertical: 10,
+    marginBottom: 8,
+    backgroundColor: "#f0fdfa",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#99f6e4",
+  },
+  dateDoneText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#0f766e",
   },
   row: {
     flexDirection: "row",
