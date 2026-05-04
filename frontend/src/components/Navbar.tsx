@@ -1,73 +1,127 @@
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { Button } from "./Button";
+
+const navPillClass = ({ isActive }: { isActive: boolean }) =>
+  [
+    "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+    isActive
+      ? "bg-gray-900 text-white"
+      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+  ].join(" ");
 
 const Navbar = () => {
   const { user, logout, isAdmin } = useAuth();
-  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const isActive = (path: string) => location.pathname === path;
+  const closeMenu = () => setMenuOpen(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [menuOpen]);
+
+  const initial =
+    user?.first_name?.trim().charAt(0).toUpperCase() ||
+    user?.email?.charAt(0).toUpperCase() ||
+    "?";
 
   return (
-    <nav className="bg-white border-b border-gray-100 px-4 py-3">
-      <div className="max-w-5xl mx-auto flex items-center justify-between">
-        <Link to="/" className="text-base font-medium text-gray-900">
+    <header className="mx-auto w-full max-w-6xl">
+      <nav className="flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3 shadow-md ring-1 ring-black/5 sm:px-6">
+        <Link
+          to="/"
+          className="shrink-0 text-base font-semibold tracking-tight text-gray-900"
+          onClick={closeMenu}
+        >
           VilaDays
         </Link>
-        <div className="flex items-center gap-6 text-sm">
-          <Link
-            to="/"
-            className={
-              isActive("/")
-                ? "text-gray-900 font-medium"
-                : "text-gray-400 hover:text-gray-600"
-            }
-          >
+
+        <div className="flex flex-1 flex-wrap items-center justify-center gap-1 sm:gap-2">
+          <NavLink to="/" end className={navPillClass} onClick={closeMenu}>
             Explore
-          </Link>
-          <Link
-            to="/my-plan"
-            className={
-              isActive("/my-plan")
-                ? "text-gray-900 font-medium"
-                : "text-gray-400 hover:text-gray-600"
-            }
-          >
+          </NavLink>
+          <NavLink to="/my-plan" className={navPillClass} onClick={closeMenu}>
             My plan
-          </Link>
-          <Link
-            to="/calendar"
-            className={
-              isActive("/calendar")
-                ? "text-gray-900 font-medium"
-                : "text-gray-400 hover:text-gray-600"
-            }
-          >
+          </NavLink>
+          <NavLink to="/calendar" className={navPillClass} onClick={closeMenu}>
             Calendar
-          </Link>
+          </NavLink>
           {isAdmin && (
-            <Link
-              to="/admin"
-              className={
-                isActive("/admin")
-                  ? "text-gray-900 font-medium"
-                  : "text-gray-400 hover:text-gray-600"
-              }
-            >
+            <NavLink to="/admin" className={navPillClass} onClick={closeMenu}>
               Admin
-            </Link>
+            </NavLink>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400">{user?.first_name}</span>
-          <button
-            onClick={logout}
-            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div
+            className="hidden max-w-44 cursor-default items-center gap-2 rounded-full bg-gray-100 px-4 py-2.5 text-sm text-gray-400 lg:inline-flex"
+            aria-hidden
           >
-            Log out
+            <span className="text-gray-400">⌕</span>
+            <span>Search</span>
+          </div>
+
+          <button
+            type="button"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200"
+            aria-label="Notifications"
+          >
+            <span className="text-lg leading-none">🔔</span>
           </button>
+
+          {user && (
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((o) => !o)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                aria-controls="account-menu"
+                id="account-menu-button"
+                aria-label="Account menu"
+              >
+                {initial}
+              </button>
+              {menuOpen && (
+                <div
+                  id="account-menu"
+                  role="menu"
+                  aria-labelledby="account-menu-button"
+                  className="absolute right-0 top-full z-50 mt-2 min-w-48 rounded-xl border border-gray-100 bg-white py-2 shadow-lg ring-1 ring-black/5"
+                >
+                  <p className="border-b border-gray-100 px-3 pb-2 text-xs text-gray-500">
+                    Hi, {user.first_name.trim() || "there"}
+                  </p>
+                  <div className="px-2 pt-2">
+                    <Button
+                      variant="outline"
+                      fullWidth
+                      text="Log out"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        logout();
+                      }}
+                      className="text-gray-700"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 };
 

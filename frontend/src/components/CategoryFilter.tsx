@@ -18,26 +18,27 @@ export function CategoryFilter<T extends string>({
   isDisabled,
 }: CategoryFilterProps<T>) {
   return (
-    <div className={["flex gap-2 flex-wrap", className ?? ""].join(" ")}>
-      <PillButton
-        isActive={!value}
-        onClick={() => onChange(undefined)}
-        disabled={isDisabled}
-      >
-        {allLabel}
-      </PillButton>
-      {categories.map((cat) => (
+    <div className={className}>
+      <div className="flex flex-wrap items-center justify-center gap-1 rounded-2xl bg-gray-50 px-2 py-2 shadow-sm ring-1 ring-gray-900/5">
         <PillButton
-          key={cat}
-          isActive={value === cat}
-          onClick={() => onChange(cat)}
-          className="capitalize"
+          isActive={!value}
+          onClick={() => onChange(undefined)}
           disabled={isDisabled}
         >
-          {cat}
+          {allLabel}
         </PillButton>
-      ))}
+        {categories.map((cat) => (
+          <PillButton
+            key={cat}
+            isActive={value === cat}
+            onClick={() => onChange(cat)}
+            className="capitalize"
+            disabled={isDisabled}
+          >
+            {cat}
+          </PillButton>
+        ))}
+      </div>
     </div>
   );
 }
-

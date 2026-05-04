@@ -4,6 +4,7 @@ export type PillButtonProps = {
   isActive?: boolean;
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type">;
 
+/** Matches floating-nav “pill” style: active = solid black, inactive = text only + hover wash. */
 export function PillButton({
   isActive,
   className,
@@ -11,11 +12,11 @@ export function PillButton({
   ...props
 }: PillButtonProps) {
   const base =
-    "px-4 py-1.5 rounded-full text-sm border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30";
-  const active = "bg-gray-900 text-white border-gray-900";
+    "rounded-full px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/30 focus-visible:ring-offset-2";
+  const active = "bg-gray-900 text-white";
   const inactive =
-    "bg-white text-gray-600 border-gray-200 hover:border-gray-400";
-  const disabledStyles = "opacity-60 pointer-events-none";
+    "text-gray-600 hover:bg-gray-50 hover:text-gray-900 bg-transparent";
+  const disabledStyles = "opacity-50 pointer-events-none";
 
   return (
     <button
@@ -31,4 +32,3 @@ export function PillButton({
     />
   );
 }
-
