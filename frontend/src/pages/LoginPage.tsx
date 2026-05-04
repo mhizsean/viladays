@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { login } from "../api/auth";
+import { AppLogo } from "../components/AppLogo";
 import { FormTextField } from "../components/FormTextField";
 
 export const LoginPage = () => {
@@ -33,8 +34,12 @@ export const LoginPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white px-8 py-6 rounded-xl shadow-sm border border-gray-200 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h1>
-        <p className="text-gray-500 mb-6">Log in to your VilaDays account</p>
+        <div className="mb-1 flex justify-center">
+          <AppLogo className="h-12 w-auto max-w-[min(100%,18rem)] object-contain sm:h-16" />
+        </div>
+        <p className="text-gray-500 mb-2 text-center">
+          Welcome back, log in to your account
+        </p>
 
         {error && (
           <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">

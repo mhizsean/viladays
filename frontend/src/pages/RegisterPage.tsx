@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { register } from "../api/auth";
+import { AppLogo } from "../components/AppLogo";
 import { FormTextField } from "../components/FormTextField";
 import type { RegisterFormFields } from "../types/auth";
 
@@ -39,10 +40,13 @@ export const RegisterPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-xl shadow-sm w-full max-w-md">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Create account
-        </h1>
-        <p className="text-gray-500 mb-6">Start planning your Edinburgh trip</p>
+        <div className="mb-1 flex justify-center">
+          <AppLogo className="h-12 w-auto max-w-[min(100%,18rem)] object-contain sm:h-16" />
+        </div>
+
+        <p className="text-gray-500 mb-6 text-center">
+          Create your account for free
+        </p>
 
         {error && (
           <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">

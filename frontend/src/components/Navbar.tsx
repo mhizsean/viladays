@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { AppLogo } from "./AppLogo";
 import { Button } from "./Button";
 
 const navPillClass = ({ isActive }: { isActive: boolean }) =>
@@ -37,12 +38,8 @@ const Navbar = () => {
   return (
     <header className="mx-auto w-full max-w-6xl">
       <nav className="flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3 shadow-md ring-1 ring-black/5 sm:px-6">
-        <Link
-          to="/"
-          className="shrink-0 text-base font-semibold tracking-tight text-gray-900"
-          onClick={closeMenu}
-        >
-          VilaDays
+        <Link to="/" className="flex shrink-0 items-center" onClick={closeMenu}>
+          <AppLogo className="h-12 w-auto max-w-[min(100%,11rem)] object-contain sm:h-9 sm:max-w-56" />
         </Link>
 
         <div className="flex flex-1 flex-wrap items-center justify-center gap-1 sm:gap-2">
