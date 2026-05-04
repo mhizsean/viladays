@@ -21,6 +21,15 @@ function toLocalMax(iso: string) {
   return iso.slice(0, 10) + "T23:59";
 }
 
+function calcDayIndex(startTimeStr: string, tripStartDateStr: string): number {
+  const eventDate = new Date(startTimeStr);
+  eventDate.setHours(0, 0, 0, 0);
+  const tripStart = new Date(tripStartDateStr);
+  tripStart.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((eventDate.getTime() - tripStart.getTime()) / 86400000);
+  return Math.max(1, diffDays + 1);
+}
+
 const AddToTripModal = ({ mode = "event", event, preselectedTripId, tripStartDate, tripEndDate, onClose }: Props) => {
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>(mode === "custom" ? "custom-form" : "select");
@@ -221,7 +230,13 @@ const AddToTripModal = ({ mode = "event", event, preselectedTripId, tripStartDat
                     value={customStartTime}
                     min={tripBounds?.min}
                     max={tripBounds?.max}
-                    onChange={(e) => { setCustomStartTime(e.target.value); setCustomFormError(null); }}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomStartTime(val);
+                      setCustomFormError(null);
+                      const tripStart = tripStartDate ?? itineraries?.find(t => t.id === selectedTripId)?.start_date;
+                      if (val && tripStart) setCustomDay(calcDayIndex(val, tripStart));
+                    }}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
                   />
                 </div>

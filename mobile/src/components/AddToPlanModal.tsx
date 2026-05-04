@@ -37,6 +37,14 @@ type Props = {
 type DatePickerField = "start" | "end";
 type PlanModalStep = "select" | "create" | "custom-form";
 
+function calcDayIndex(selected: Date, tripStartDateStr: string): number {
+  const eventDate = new Date(selected);
+  eventDate.setHours(0, 0, 0, 0);
+  const tripStart = new Date(new Date(tripStartDateStr).toDateString());
+  const diffDays = Math.round((eventDate.getTime() - tripStart.getTime()) / 86400000);
+  return Math.max(1, diffDays + 1);
+}
+
 function formatYmd(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -317,8 +325,12 @@ export function AddToPlanModal({
       return;
     }
     if (!selected) return;
-    if (field === "customStart") setCustomStartTime(selected);
-    else setCustomEndTime(selected);
+    if (field === "customStart") {
+      setCustomStartTime(selected);
+      if (tripStartDate) setCustomDay(String(calcDayIndex(selected, tripStartDate)));
+    } else {
+      setCustomEndTime(selected);
+    }
     setCustomFormError(null);
   };
 
