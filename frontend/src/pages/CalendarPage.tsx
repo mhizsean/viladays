@@ -1,23 +1,20 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getEvents } from "../api/events";
-import type { Event } from "../types/event";
+import type { Event, EventCategory } from "../types/event";
 import AddToPlanModal from "../components/AddToPlanModal";
+import { Button } from "../components/Button";
 
-const categoryColors: Record<string, string> = {
-  culture: "bg-blue-50 text-blue-700 border-blue-100",
-  food: "bg-green-50 text-green-700 border-green-100",
-  outdoor: "bg-teal-50 text-teal-700 border-teal-100",
-  history: "bg-orange-50 text-orange-700 border-orange-100",
-  nightlife: "bg-purple-50 text-purple-700 border-purple-100",
-  shopping: "bg-pink-50 text-pink-700 border-pink-100",
-  family: "bg-yellow-50 text-yellow-700 border-yellow-100",
-  art: "bg-rose-50 text-rose-700 border-rose-100",
-  sports: "bg-cyan-50 text-cyan-700 border-cyan-100",
-  other: "bg-gray-50 text-gray-700 border-gray-100",
-};
+const WEEKDAYS = [
+  "Sun",
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+] as const;
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
   "January",
   "February",
@@ -31,14 +28,71 @@ const MONTHS = [
   "October",
   "November",
   "December",
-];
+] as const;
+
+const CATEGORY_BADGE: Record<EventCategory, string> = {
+  culture: "bg-blue-50 text-blue-700 border-blue-100",
+  food: "bg-green-50 text-green-700 border-green-100",
+  outdoor: "bg-teal-50 text-teal-700 border-teal-100",
+  history: "bg-orange-50 text-orange-700 border-orange-100",
+  nightlife: "bg-purple-50 text-purple-700 border-purple-100",
+  shopping: "bg-pink-50 text-pink-700 border-pink-100",
+  family: "bg-yellow-50 text-yellow-700 border-yellow-100",
+  art: "bg-rose-50 text-rose-700 border-rose-100",
+  sports: "bg-cyan-50 text-cyan-700 border-cyan-100",
+  other: "bg-gray-50 text-gray-700 border-gray-100",
+};
+
+function eventsOnCalendarDay(
+  events: Event[] | undefined,
+  year: number,
+  monthIndex: number,
+  dayOfMonth: number,
+): Event[] {
+  if (!events?.length) return [];
+  return events.filter((event) => {
+    const d = new Date(event.start_datetime);
+    return (
+      d.getFullYear() === year &&
+      d.getMonth() === monthIndex &&
+      d.getDate() === dayOfMonth
+    );
+  });
+}
+
+function eventsOnSameDate(
+  events: Event[] | undefined,
+  date: Date,
+): Event[] {
+  return eventsOnCalendarDay(
+    events,
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+}
+
+function buildMonthCells(firstDayOfMonth: number, daysInMonth: number) {
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  return cells;
+}
+
+function formatTimeRangeEnGB(startIso: string, endIso: string) {
+  const opts: Intl.DateTimeFormatOptions = {
+    hour: "2-digit",
+    minute: "2-digit",
+  };
+  return `${new Date(startIso).toLocaleTimeString("en-GB", opts)} — ${new Date(endIso).toLocaleTimeString("en-GB", opts)}`;
+}
 
 const CalendarPage = () => {
   const today = new Date();
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
-  const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(() => today.getMonth());
+  const [currentYear, setCurrentYear] = useState(() => today.getFullYear());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   const { data: events } = useQuery({
     queryKey: ["events"],
@@ -66,39 +120,15 @@ const CalendarPage = () => {
     }
   };
 
-  const getEventsForDay = (day: number) => {
-    if (!events) return [];
-    return events.filter((event) => {
-      const eventDate = new Date(event.start_datetime);
-      return (
-        eventDate.getDate() === day &&
-        eventDate.getMonth() === currentMonth &&
-        eventDate.getFullYear() === currentYear
-      );
-    });
-  };
+  const cells = useMemo(
+    () => buildMonthCells(firstDayOfMonth, daysInMonth),
+    [firstDayOfMonth, daysInMonth],
+  );
 
-  const getDayEvents = (date: Date) => {
-    if (!events) return [];
-    return events.filter((event) => {
-      const eventDate = new Date(event.start_datetime);
-      return (
-        eventDate.getDate() === date.getDate() &&
-        eventDate.getMonth() === date.getMonth() &&
-        eventDate.getFullYear() === date.getFullYear()
-      );
-    });
-  };
-
-  const cells = [];
-  for (let i = 0; i < firstDayOfMonth; i++) {
-    cells.push(null);
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    cells.push(i);
-  }
-
-  const selectedDayEvents = selectedDate ? getDayEvents(selectedDate) : [];
+  const selectedDayEvents = useMemo(
+    () => (selectedDate ? eventsOnSameDate(events, selectedDate) : []),
+    [events, selectedDate],
+  );
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -106,13 +136,13 @@ const CalendarPage = () => {
       <p className="text-sm text-gray-500 mb-8">Browse events by date</p>
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6">
-        {/* Calendar grid */}
         <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-          {/* Month navigation */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <button
+              type="button"
               onClick={prevMonth}
               className="text-gray-400 hover:text-gray-600 transition-colors text-lg"
+              aria-label="Previous month"
             >
               ←
             </button>
@@ -120,16 +150,17 @@ const CalendarPage = () => {
               {MONTHS[currentMonth]} {currentYear}
             </span>
             <button
+              type="button"
               onClick={nextMonth}
               className="text-gray-400 hover:text-gray-600 transition-colors text-lg"
+              aria-label="Next month"
             >
               →
             </button>
           </div>
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 border-b border-gray-100">
-            {DAYS.map((day) => (
+            {WEEKDAYS.map((day) => (
               <div
                 key={day}
                 className="text-center text-xs font-medium text-gray-400 py-2"
@@ -139,18 +170,23 @@ const CalendarPage = () => {
             ))}
           </div>
 
-          {/* Day cells */}
           <div className="grid grid-cols-7">
             {cells.map((day, index) => {
-              if (!day)
+              if (day == null) {
                 return (
                   <div
                     key={`empty-${index}`}
-                    className="border-b border-r border-gray-50 min-h-[80px]"
+                    className="border-b border-r border-gray-50 min-h-20"
                   />
                 );
+              }
 
-              const dayEvents = getEventsForDay(day);
+              const dayEvents = eventsOnCalendarDay(
+                events,
+                currentYear,
+                currentMonth,
+                day,
+              );
               const isToday =
                 day === today.getDate() &&
                 currentMonth === today.getMonth() &&
@@ -166,7 +202,7 @@ const CalendarPage = () => {
                   onClick={() =>
                     setSelectedDate(new Date(currentYear, currentMonth, day))
                   }
-                  className={`border-b border-r border-gray-50 min-h-[80px] p-1.5 cursor-pointer transition-colors ${
+                  className={`border-b border-r border-gray-50 min-h-20 p-1.5 cursor-pointer transition-colors ${
                     isSelected ? "bg-gray-50" : "hover:bg-gray-50"
                   }`}
                 >
@@ -183,7 +219,7 @@ const CalendarPage = () => {
                     {dayEvents.slice(0, 2).map((event) => (
                       <div
                         key={event.id}
-                        className={`text-xs px-1 py-0.5 rounded border truncate ${categoryColors[event.category]}`}
+                        className={`text-xs px-1 py-0.5 rounded border truncate ${CATEGORY_BADGE[event.category]}`}
                       >
                         {event.title}
                       </div>
@@ -200,7 +236,6 @@ const CalendarPage = () => {
           </div>
         </div>
 
-        {/* Day detail panel */}
         <div className="bg-white border border-gray-100 rounded-xl p-4">
           {!selectedDate ? (
             <div className="text-center text-gray-400 text-sm py-8">
@@ -227,39 +262,27 @@ const CalendarPage = () => {
                     className="border border-gray-100 rounded-lg p-3"
                   >
                     <div
-                      className={`inline-block text-xs px-2 py-0.5 rounded border capitalize mb-2 ${categoryColors[event.category]}`}
+                      className={`inline-block text-xs px-2 py-0.5 rounded border capitalize mb-2 ${CATEGORY_BADGE[event.category]}`}
                     >
                       {event.category}
                     </div>
                     <p className="font-medium text-sm text-gray-900 mb-1">
                       {event.title}
                     </p>
-                    <p className="text-xs text-gray-400 mb-1">
-                      {event.location}
-                    </p>
+                    <p className="text-xs text-gray-400 mb-1">{event.location}</p>
                     <p className="text-xs text-gray-400 mb-3">
-                      {new Date(event.start_datetime).toLocaleTimeString(
-                        "en-GB",
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )}{" "}
-                      —{" "}
-                      {new Date(event.end_datetime).toLocaleTimeString(
-                        "en-GB",
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
+                      {formatTimeRangeEnGB(
+                        event.start_datetime,
+                        event.end_datetime,
                       )}
                     </p>
-                    <button
+                    <Button
+                      variant="outline"
+                      fullWidth
+                      className="text-xs py-1.5"
+                      text="+ Add to plan"
                       onClick={() => setSelectedEvent(event)}
-                      className="w-full text-xs py-1.5 rounded-lg border border-gray-200 hover:border-gray-400 transition-colors"
-                    >
-                      + Add to plan
-                    </button>
+                    />
                   </div>
                 ))}
               </div>

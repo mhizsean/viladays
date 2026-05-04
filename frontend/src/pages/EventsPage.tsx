@@ -2,24 +2,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getEvents } from "../api/events";
 import type { Event, EventCategory } from "../types/event";
+import { EVENT_CATEGORIES } from "../constants/eventCategories";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { Button } from "../components/Button";
 import AddToPlanModal from "../components/AddToPlanModal";
 
-const categories: EventCategory[] = [
-  "culture",
-  "food",
-  "outdoor",
-  "history",
-  "nightlife",
-  "shopping",
-  "family",
-  "art",
-  "sports",
-  "other",
-];
-
-const categoryColors: Record<EventCategory, { bg: string; text: string }> = {
+const CATEGORY_CHIP: Record<EventCategory, { bg: string; text: string }> = {
   culture: { bg: "bg-blue-50", text: "text-blue-700" },
   food: { bg: "bg-green-50", text: "text-green-700" },
   outdoor: { bg: "bg-teal-50", text: "text-teal-700" },
@@ -32,17 +20,74 @@ const categoryColors: Record<EventCategory, { bg: string; text: string }> = {
   other: { bg: "bg-gray-50", text: "text-gray-700" },
 };
 
+function formatEventCardWhen(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const time = d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${date} · ${time}`;
+}
+
+function categoryChipClass(category: EventCategory): string {
+  const c = CATEGORY_CHIP[category];
+  return `${c.bg} ${c.text}`;
+}
+
+function EventCard({
+  event,
+  onAddToPlan,
+}: {
+  event: Event;
+  onAddToPlan: () => void;
+}) {
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-gray-300 transition-colors">
+      <div className="h-36 bg-gray-100 flex items-center justify-center text-4xl">
+        {event.image_url ? (
+          <img
+            src={event.image_url}
+            alt={event.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          "📍"
+        )}
+      </div>
+      <div className="p-4">
+        <div
+          className={`inline-block text-xs font-medium px-2 py-0.5 rounded mb-2 capitalize ${categoryChipClass(event.category)}`}
+        >
+          {event.category}
+        </div>
+        <h3 className="font-medium text-gray-900 mb-1">{event.title}</h3>
+        <p className="text-xs text-gray-500 mb-1">{event.location}</p>
+        <p className="text-xs text-gray-400 mb-4">
+          {formatEventCardWhen(event.start_datetime)}
+        </p>
+        <Button
+          variant="outline"
+          fullWidth
+          text="+ Add to plan"
+          onClick={onAddToPlan}
+        />
+      </div>
+    </div>
+  );
+}
+
 const EventsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<
     EventCategory | undefined
   >();
   const [selectedEvent, setSelectedEvent] = useState<Event | undefined>();
 
-  const {
-    data: events,
-    isLoading,
-    isError,
-  } = useQuery({
+  const { data: events, isLoading, isError } = useQuery({
     queryKey: ["events", selectedCategory],
     queryFn: () => getEvents({ category: selectedCategory }),
   });
@@ -58,7 +103,7 @@ const EventsPage = () => {
 
       <CategoryFilter<EventCategory>
         className="mb-8"
-        categories={categories}
+        categories={EVENT_CATEGORIES}
         value={selectedCategory}
         onChange={setSelectedCategory}
         allLabel="All"
@@ -84,51 +129,11 @@ const EventsPage = () => {
       {events && events.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {events.map((event) => (
-            <div
+            <EventCard
               key={event.id}
-              className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-gray-300 transition-colors"
-            >
-              <div className="h-36 bg-gray-100 flex items-center justify-center text-4xl">
-                {event.image_url ? (
-                  <img
-                    src={event.image_url}
-                    alt={event.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  "📍"
-                )}
-              </div>
-              <div className="p-4">
-                <div
-                  className={`inline-block text-xs font-medium px-2 py-0.5 rounded mb-2 capitalize ${categoryColors[event.category].bg} ${categoryColors[event.category].text}`}
-                >
-                  {event.category}
-                </div>
-                <h3 className="font-medium text-gray-900 mb-1">
-                  {event.title}
-                </h3>
-                <p className="text-xs text-gray-500 mb-1">{event.location}</p>
-                <p className="text-xs text-gray-400 mb-4">
-                  {new Date(event.start_datetime).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}{" "}
-                  ·{" "}
-                  {new Date(event.start_datetime).toLocaleTimeString("en-GB", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-                <Button
-                  variant="outline"
-                  fullWidth
-                  text="+ Add to plan"
-                  onClick={() => setSelectedEvent(event)}
-                />
-              </div>
-            </div>
+              event={event}
+              onAddToPlan={() => setSelectedEvent(event)}
+            />
           ))}
         </div>
       )}

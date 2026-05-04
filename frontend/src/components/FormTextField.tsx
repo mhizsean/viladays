@@ -1,12 +1,14 @@
 import { useId, type ComponentPropsWithoutRef } from "react";
 
-const inputClassName =
+const baseInputClassName =
   "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export type FormTextFieldProps = {
   label: string;
   /** Classes on the outer wrapper (e.g. layout in a grid). */
   wrapperClassName?: string;
+  /** Extra classes on the `<input>` (after base styles). */
+  inputClassName?: string;
 } & Omit<ComponentPropsWithoutRef<"input">, "className">;
 
 export function FormTextField({
@@ -14,6 +16,7 @@ export function FormTextField({
   id: idProp,
   name,
   wrapperClassName,
+  inputClassName,
   required,
   ...inputProps
 }: FormTextFieldProps) {
@@ -32,7 +35,7 @@ export function FormTextField({
         id={id}
         name={name}
         required={required}
-        className={inputClassName}
+        className={[baseInputClassName, inputClassName].filter(Boolean).join(" ")}
         {...inputProps}
       />
     </div>
