@@ -26,7 +26,7 @@ const App = () => {
           }
         />
         <Route
-          path="/my-plan"
+          path="/my-trips"
           element={
             <UserOnlyRoute>
               <Layout>

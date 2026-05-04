@@ -41,7 +41,7 @@ def get_one(
     if not itinerary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Itinerary not found",
+            detail="Trip not found",
         )
     return itinerary
 
@@ -57,7 +57,7 @@ def add_itinerary_item(
     if not itinerary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Itinerary not found"
+            detail="Trip not found"
         )
     return add_item(db, itinerary_id, data)
 
@@ -74,7 +74,7 @@ def update_itinerary_item(
     if not itinerary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Itinerary not found"
+            detail="Trip not found"
         )
     item = update_item(db, item_id, data)
     if not item:
@@ -96,7 +96,7 @@ def remove_itinerary_item(
     if not itinerary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Itinerary not found"
+            detail="Trip not found"
         )
     success = remove_item(db, item_id)
     if not success:

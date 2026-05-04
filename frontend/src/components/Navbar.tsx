@@ -49,11 +49,11 @@ const Navbar = () => {
           {!isAdmin && (
             <>
               <NavLink
-                to="/my-plan"
+                to="/my-trips"
                 className={navPillClass}
                 onClick={closeMenu}
               >
-                My plan
+                My Trips
               </NavLink>
               <NavLink
                 to="/calendar"

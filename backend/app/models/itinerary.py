@@ -23,11 +23,17 @@ class ItineraryItem(Base):
     __tablename__ = "itinerary_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    itinerary_id = Column(Integer, ForeignKey(
-        "itineraries.id"), nullable=False)
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    itinerary_id = Column(Integer, ForeignKey("itineraries.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=True)
     day_index = Column(Integer, nullable=False)
     custom_note = Column(Text, nullable=True)
 
+    # Custom (user-defined) event fields
+    custom_title = Column(String, nullable=True)
+    custom_location = Column(String, nullable=True)
+    custom_start_time = Column(DateTime, nullable=True)
+    custom_end_time = Column(DateTime, nullable=True)
+    custom_notes = Column(Text, nullable=True)
+
     itinerary = relationship("Itinerary", back_populates="items")
-    event = relationship("Event")
+    event = relationship("Event", foreign_keys=[event_id])

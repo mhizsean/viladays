@@ -32,7 +32,12 @@ def add_item(db: Session, itinerary_id: int, data: ItineraryItemCreate) -> Itine
         itinerary_id=itinerary_id,
         event_id=data.event_id,
         day_index=data.day_index,
-        custom_note=data.custom_note
+        custom_note=data.custom_note,
+        custom_title=data.custom_title,
+        custom_location=data.custom_location,
+        custom_start_time=data.custom_start_time,
+        custom_end_time=data.custom_end_time,
+        custom_notes=data.custom_notes,
     )
     db.add(item)
     db.commit()

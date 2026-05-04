@@ -26,11 +26,16 @@ import type { Event } from "../types/event";
 type Props = {
   visible: boolean;
   event: Event | null;
+  mode?: "event" | "custom";
+  preselectedTripId?: number;
+  tripStartDate?: string;
+  tripEndDate?: string;
   onClose: () => void;
   onSuccess?: () => void;
 };
 
 type DatePickerField = "start" | "end";
+type PlanModalStep = "select" | "create" | "custom-form";
 
 function formatYmd(d: Date): string {
   const y = d.getFullYear();
@@ -42,15 +47,10 @@ function formatYmd(d: Date): string {
 function parseYmd(s: string): Date | null {
   const t = s.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
-  const [y, m, d] = t.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  if (
-    dt.getFullYear() !== y ||
-    dt.getMonth() !== m - 1 ||
-    dt.getDate() !== d
-  ) {
+  const [y, mo, d] = t.split("-").map(Number);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d)
     return null;
-  }
   return dt;
 }
 
@@ -64,7 +64,6 @@ function formatDisplayYmd(ymd: string): string {
   });
 }
 
-/** Local noon → ISO to avoid UTC date shifts for calendar-only values. */
 function ymdToIsoMidday(ymd: string): string {
   const d = parseYmd(ymd);
   if (!d) return new Date(ymd).toISOString();
@@ -72,45 +71,67 @@ function ymdToIsoMidday(ymd: string): string {
   return d.toISOString();
 }
 
+
 export function AddToPlanModal({
   visible,
   event,
+  mode = "event",
+  preselectedTripId,
+  tripStartDate,
+  tripEndDate,
   onClose,
   onSuccess,
 }: Props) {
-  const [view, setView] = useState<"select" | "create">("select");
+  const tripMinDate = tripStartDate ? new Date(new Date(tripStartDate).toDateString()) : null;
+  const tripMaxDate = tripEndDate ? (() => { const d = new Date(new Date(tripEndDate).toDateString()); d.setHours(23, 59, 59); return d; })() : null;
+  const [view, setView] = useState<PlanModalStep>(
+    mode === "custom" ? "custom-form" : "select",
+  );
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(false);
-  const [selectedItineraryId, setSelectedItineraryId] = useState<number | null>(
-    null,
+  const [loadingTrips, setLoadingTrips] = useState(false);
+  const [selectedTripId, setSelectedTripId] = useState<number | null>(
+    preselectedTripId ?? null,
   );
   const [dayIndex, setDayIndex] = useState("1");
-  const [newPlanName, setNewPlanName] = useState("");
+
+  // Create trip form
+  const [newTripName, setNewTripName] = useState("");
   const [newStartDate, setNewStartDate] = useState("");
   const [newEndDate, setNewEndDate] = useState("");
   const [createFormError, setCreateFormError] = useState<string | null>(null);
+  const [datePickerField, setDatePickerField] =
+    useState<DatePickerField | null>(null);
+
+  // Custom event form
+  const [customTitle, setCustomTitle] = useState("");
+  const [customLocation, setCustomLocation] = useState("");
+  const [customStartTime, setCustomStartTime] = useState<Date | null>(null);
+  const [customEndTime, setCustomEndTime] = useState<Date | null>(null);
+  const [customNotes, setCustomNotes] = useState("");
+  const [customDay, setCustomDay] = useState("1");
+  const [customFormError, setCustomFormError] = useState<string | null>(null);
+  const [timePickerField, setTimePickerField] = useState<
+    "customStart" | "customEnd" | null
+  >(null);
+
   const [success, setSuccess] = useState(false);
   const [pending, setPending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
-  const [datePickerField, setDatePickerField] = useState<DatePickerField | null>(
-    null,
-  );
 
   useEffect(() => {
     const showEvt =
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvt =
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const onShow = (e: { endCoordinates: { height: number } }) => {
+    const onShow = (e: { endCoordinates: { height: number } }) =>
       setKeyboardInset(e.endCoordinates.height);
-    };
     const onHide = () => setKeyboardInset(0);
-    const subShow = Keyboard.addListener(showEvt, onShow);
-    const subHide = Keyboard.addListener(hideEvt, onHide);
+    const s1 = Keyboard.addListener(showEvt, onShow);
+    const s2 = Keyboard.addListener(hideEvt, onHide);
     return () => {
-      subShow.remove();
-      subHide.remove();
+      s1.remove();
+      s2.remove();
     };
   }, []);
 
@@ -119,45 +140,70 @@ export function AddToPlanModal({
   }, [visible]);
 
   const reset = useCallback(() => {
-    setView("select");
-    setSelectedItineraryId(null);
+    setView(mode === "custom" ? "custom-form" : "select");
+    setSelectedTripId(preselectedTripId ?? null);
     setDayIndex("1");
-    setNewPlanName("");
+    setNewTripName("");
     setNewStartDate("");
     setNewEndDate("");
     setCreateFormError(null);
     setSuccess(false);
     setLoadError(null);
     setDatePickerField(null);
-  }, []);
+    setTimePickerField(null);
+    setCustomTitle("");
+    setCustomLocation("");
+    setCustomNotes("");
+    setCustomStartTime(null);
+    setCustomEndTime(null);
+    setCustomDay("1");
+    setCustomFormError(null);
+  }, [mode, preselectedTripId]);
 
   useEffect(() => {
-    if (!visible || !event) return;
+    if (!visible) return;
     reset();
-    setLoadingPlans(true);
+    if (preselectedTripId !== undefined) return; // trip already known, skip fetch for now
+    setLoadingTrips(true);
     void (async () => {
       try {
         const data = await fetchItineraries();
         setItineraries(data);
       } catch {
-        setLoadError("Could not load your plans.");
+        setLoadError("Could not load your trips.");
       } finally {
-        setLoadingPlans(false);
+        setLoadingTrips(false);
       }
     })();
-  }, [visible, event, reset]);
+  }, [visible, reset, preselectedTripId]);
+
+  // Also fetch trips for custom mode when no preselectedTripId
+  useEffect(() => {
+    if (!visible || preselectedTripId !== undefined) return;
+    setLoadingTrips(true);
+    void (async () => {
+      try {
+        const data = await fetchItineraries();
+        setItineraries(data);
+      } catch {
+        setLoadError("Could not load your trips.");
+      } finally {
+        setLoadingTrips(false);
+      }
+    })();
+  }, [visible, preselectedTripId]);
 
   const handleClose = () => {
     reset();
     onClose();
   };
 
-  const handleAdd = async () => {
-    if (!event || !selectedItineraryId) return;
+  const handleAddEvent = async () => {
+    if (!event || !selectedTripId) return;
     const day = Math.max(1, parseInt(dayIndex, 10) || 1);
     setPending(true);
     try {
-      await addItineraryItem(selectedItineraryId, {
+      await addItineraryItem(selectedTripId, {
         event_id: event.id,
         day_index: day,
       });
@@ -171,57 +217,112 @@ export function AddToPlanModal({
     }
   };
 
+  const handleAddCustom = async () => {
+    if (!customTitle.trim()) {
+      setCustomFormError("Title is required.");
+      return;
+    }
+    if (!selectedTripId) {
+      setCustomFormError("Please select a trip first.");
+      return;
+    }
+    if (customStartTime && customEndTime && customEndTime < customStartTime) {
+      setCustomFormError("End time must be after start time.");
+      return;
+    }
+    if (tripMinDate && tripMaxDate) {
+      if (customStartTime && (customStartTime < tripMinDate || customStartTime > tripMaxDate)) {
+        setCustomFormError(`Start time must be within the trip dates.`);
+        return;
+      }
+      if (customEndTime && (customEndTime < tripMinDate || customEndTime > tripMaxDate)) {
+        setCustomFormError(`End time must be within the trip dates.`);
+        return;
+      }
+    }
+    setCustomFormError(null);
+    const day = Math.max(1, parseInt(customDay, 10) || 1);
+    setPending(true);
+    try {
+      await addItineraryItem(selectedTripId, {
+        custom_title: customTitle.trim(),
+        custom_location: customLocation.trim() || undefined,
+        custom_start_time: customStartTime?.toISOString(),
+        custom_end_time: customEndTime?.toISOString(),
+        custom_notes: customNotes.trim() || undefined,
+        day_index: day,
+      });
+      setSuccess(true);
+      onSuccess?.();
+      setTimeout(handleClose, 1200);
+    } catch {
+      setCustomFormError("Could not save event. Try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+
   const handleCreate = async () => {
-    if (!newPlanName.trim() || !newStartDate || !newEndDate) return;
+    if (!newTripName.trim() || !newStartDate || !newEndDate) return;
     if (newEndDate < newStartDate) {
-      setCreateFormError("End date must be on or after the start date.");
+      setCreateFormError("End date must be on or after start date.");
       return;
     }
     setCreateFormError(null);
     setPending(true);
     try {
       const created = await createItinerary({
-        name: newPlanName.trim(),
+        name: newTripName.trim(),
         start_date: ymdToIsoMidday(newStartDate),
         end_date: ymdToIsoMidday(newEndDate),
       });
       setItineraries((prev) => [...prev, created]);
-      setSelectedItineraryId(created.id);
+      setSelectedTripId(created.id);
       setDatePickerField(null);
-      setView("select");
+      setView(mode === "custom" ? "custom-form" : "select");
     } catch {
-      setCreateFormError("Could not create plan.");
+      setCreateFormError("Could not create trip.");
     } finally {
       setPending(false);
     }
   };
 
-  if (!event) return null;
-
   const onDateChange = (
     field: DatePickerField,
-    event: DateTimePickerEvent,
-    selectedDate?: Date,
+    e: DateTimePickerEvent,
+    selected?: Date,
   ) => {
     if (Platform.OS === "android") setDatePickerField(null);
-    if (event.type === "dismissed") {
+    if (e.type === "dismissed") {
       setDatePickerField(null);
       return;
     }
-    if (!selectedDate) {
-      if (Platform.OS === "android") setDatePickerField(null);
-      return;
-    }
-    const ymd = formatYmd(selectedDate);
+    if (!selected) return;
+    const ymd = formatYmd(selected);
     if (field === "start") {
       setNewStartDate(ymd);
       setNewEndDate((end) => (end && end < ymd ? ymd : end));
-    } else {
-      setNewEndDate(ymd);
-    }
+    } else setNewEndDate(ymd);
     setCreateFormError(null);
-    /* iOS inline/spinner: user taps “Done” to close; Android dialog closes itself. */
   };
+
+  const onTimeChange = (
+    field: "customStart" | "customEnd",
+    e: DateTimePickerEvent,
+    selected?: Date,
+  ) => {
+    if (Platform.OS === "android") setTimePickerField(null);
+    if (e.type === "dismissed") {
+      setTimePickerField(null);
+      return;
+    }
+    if (!selected) return;
+    if (field === "customStart") setCustomStartTime(selected);
+    else setCustomEndTime(selected);
+    setCustomFormError(null);
+  };
+
+  if (mode !== "custom" && !event) return null;
 
   return (
     <Modal
@@ -239,7 +340,7 @@ export function AddToPlanModal({
           <Pressable
             style={[
               styles.sheet,
-              keyboardInset > 0 ? styles.sheetKeyboardOpen : null,
+              keyboardInset > 0 && styles.sheetKeyboardOpen,
             ]}
             onPress={(e) => e.stopPropagation()}
           >
@@ -253,192 +354,375 @@ export function AddToPlanModal({
                 { paddingBottom: 24 + keyboardInset },
               ]}
             >
-            {success ? (
-              <View style={styles.successBox}>
-                <Text style={styles.successEmoji}>✓</Text>
-                <Text style={styles.successTitle}>Added to your plan</Text>
-              </View>
-            ) : view === "select" ? (
-              <>
-                <Text style={styles.title}>Add to plan</Text>
-                <Text style={styles.subtitle} numberOfLines={2}>
-                  {event.title}
-                </Text>
+              {success ? (
+                <View style={styles.successBox}>
+                  <Text style={styles.successEmoji}>✓</Text>
+                  <Text style={styles.successTitle}>Added to your trip</Text>
+                </View>
+              ) : view === "custom-form" ? (
+                <>
+                  <Text style={styles.title}>Add your own event</Text>
+                  <Text style={styles.subtitle}>
+                    Something not listed on the platform
+                  </Text>
 
-                {loadingPlans ? (
-                  <ActivityIndicator style={styles.loader} color="#0f766e" />
-                ) : null}
-                {loadError ? (
-                  <Text style={styles.error}>{loadError}</Text>
-                ) : null}
+                  {/* Trip picker (when no preselectedTripId) */}
+                  {preselectedTripId === undefined && (
+                    <View style={styles.field}>
+                      <Text style={styles.label}>Trip</Text>
+                      {loadingTrips ? (
+                        <ActivityIndicator
+                          style={styles.loader}
+                          color="#0f766e"
+                        />
+                      ) : null}
+                      {itineraries.map((t) => (
+                        <Pressable
+                          key={t.id}
+                          style={[
+                            styles.planRow,
+                            selectedTripId === t.id && styles.planRowSelected,
+                          ]}
+                          onPress={() => setSelectedTripId(t.id)}
+                        >
+                          <Text style={styles.planName}>{t.name}</Text>
+                          <Text style={styles.planDates}>
+                            {new Date(t.start_date).toLocaleDateString("en-GB")}{" "}
+                            → {new Date(t.end_date).toLocaleDateString("en-GB")}
+                          </Text>
+                        </Pressable>
+                      ))}
+                      <Pressable
+                        style={styles.secondaryBtn}
+                        onPress={() => setView("create")}
+                      >
+                        <Text style={styles.secondaryBtnText}>+ New trip</Text>
+                      </Pressable>
+                    </View>
+                  )}
 
-                {!loadingPlans && itineraries.length === 0 ? (
-                  <Text style={styles.hint}>You have no plans yet.</Text>
-                ) : null}
-
-                {itineraries.map((itin) => (
-                  <Pressable
-                    key={itin.id}
-                    style={[
-                      styles.planRow,
-                      selectedItineraryId === itin.id && styles.planRowSelected,
-                    ]}
-                    onPress={() => setSelectedItineraryId(itin.id)}
-                  >
-                    <Text style={styles.planName}>{itin.name}</Text>
-                    <Text style={styles.planDates}>
-                      {new Date(itin.start_date).toLocaleDateString("en-GB")} →{" "}
-                      {new Date(itin.end_date).toLocaleDateString("en-GB")}
-                    </Text>
-                  </Pressable>
-                ))}
-
-                {selectedItineraryId ? (
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Event title *</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={customTitle}
+                      onChangeText={(t) => {
+                        setCustomTitle(t);
+                        setCustomFormError(null);
+                      }}
+                      placeholder="e.g. Dinner at The Witchery"
+                    />
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Location</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={customLocation}
+                      onChangeText={setCustomLocation}
+                      placeholder="e.g. Royal Mile, Edinburgh"
+                    />
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Start time</Text>
+                    <Pressable
+                      style={styles.dateButton}
+                      onPress={() => setTimePickerField("customStart")}
+                    >
+                      <Text
+                        style={
+                          customStartTime
+                            ? styles.dateValue
+                            : styles.datePlaceholder
+                        }
+                      >
+                        {customStartTime
+                          ? customStartTime.toLocaleString("en-GB")
+                          : "Select start time"}
+                      </Text>
+                      <Text style={styles.dateChevron}>▼</Text>
+                    </Pressable>
+                    {timePickerField === "customStart" && (
+                      <DateTimePicker
+                        value={customStartTime ?? tripMinDate ?? new Date()}
+                        mode="datetime"
+                        display={Platform.OS === "ios" ? "inline" : "default"}
+                        minimumDate={tripMinDate ?? undefined}
+                        maximumDate={tripMaxDate ?? undefined}
+                        onChange={(e, d) => onTimeChange("customStart", e, d)}
+                      />
+                    )}
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={styles.label}>End time</Text>
+                    <Pressable
+                      style={styles.dateButton}
+                      onPress={() => setTimePickerField("customEnd")}
+                    >
+                      <Text
+                        style={
+                          customEndTime
+                            ? styles.dateValue
+                            : styles.datePlaceholder
+                        }
+                      >
+                        {customEndTime
+                          ? customEndTime.toLocaleString("en-GB")
+                          : "Select end time"}
+                      </Text>
+                      <Text style={styles.dateChevron}>▼</Text>
+                    </Pressable>
+                    {timePickerField === "customEnd" && (
+                      <DateTimePicker
+                        value={customEndTime ?? customStartTime ?? tripMinDate ?? new Date()}
+                        mode="datetime"
+                        display={Platform.OS === "ios" ? "inline" : "default"}
+                        minimumDate={customStartTime ?? tripMinDate ?? undefined}
+                        maximumDate={tripMaxDate ?? undefined}
+                        onChange={(e, d) => onTimeChange("customEnd", e, d)}
+                      />
+                    )}
+                  </View>
+                  {timePickerField !== null && Platform.OS === "ios" && (
+                    <Pressable
+                      style={styles.dateDoneBtn}
+                      onPress={() => setTimePickerField(null)}
+                    >
+                      <Text style={styles.dateDoneText}>Done</Text>
+                    </Pressable>
+                  )}
                   <View style={styles.field}>
                     <Text style={styles.label}>Day number</Text>
                     <TextInput
                       style={styles.input}
-                      value={dayIndex}
-                      onChangeText={setDayIndex}
+                      value={customDay}
+                      onChangeText={setCustomDay}
                       keyboardType="number-pad"
                       placeholder="1"
                     />
                   </View>
-                ) : null}
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Notes</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { height: 72, textAlignVertical: "top" },
+                      ]}
+                      value={customNotes}
+                      onChangeText={setCustomNotes}
+                      placeholder="Any notes about this event…"
+                      multiline
+                    />
+                  </View>
 
-                <View style={styles.row}>
-                  <Pressable
-                    style={styles.secondaryBtn}
-                    onPress={() => {
-                      setDatePickerField(null);
-                      setView("create");
-                    }}
-                  >
-                    <Text style={styles.secondaryBtnText}>+ New plan</Text>
-                  </Pressable>
-                  {selectedItineraryId ? (
+                  {customFormError ? (
+                    <Text style={styles.error}>{customFormError}</Text>
+                  ) : null}
+
+                  <View style={styles.row}>
+                    <Pressable
+                      style={styles.secondaryBtn}
+                      onPress={handleClose}
+                    >
+                      <Text style={styles.secondaryBtnText}>Cancel</Text>
+                    </Pressable>
                     <Pressable
                       style={[styles.primaryBtn, pending && styles.btnDisabled]}
-                      onPress={() => void handleAdd()}
+                      onPress={() => void handleAddCustom()}
                       disabled={pending}
                     >
                       <Text style={styles.primaryBtnText}>
-                        {pending ? "Adding…" : "Add to plan"}
+                        {pending ? "Saving…" : "Save event"}
                       </Text>
                     </Pressable>
-                  ) : null}
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.title}>Create a new plan</Text>
-                <View style={styles.field}>
-                  <Text style={styles.label}>Plan name</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={newPlanName}
-                    onChangeText={(t) => {
-                      setNewPlanName(t);
-                      setCreateFormError(null);
-                    }}
-                    placeholder="My trip"
-                  />
-                </View>
-                <View style={styles.field}>
-                  <Text style={styles.label}>Start date</Text>
-                  <Pressable
-                    style={styles.dateButton}
-                    onPress={() => setDatePickerField("start")}
-                  >
-                    <Text
-                      style={
-                        newStartDate ? styles.dateValue : styles.datePlaceholder
-                      }
-                    >
-                      {newStartDate
-                        ? formatDisplayYmd(newStartDate)
-                        : "Select start date"}
+                  </View>
+                </>
+              ) : view === "select" ? (
+                <>
+                  <Text style={styles.title}>Add to trip</Text>
+                  {event && (
+                    <Text style={styles.subtitle} numberOfLines={2}>
+                      {event.title}
                     </Text>
-                    <Text style={styles.dateChevron}>▼</Text>
-                  </Pressable>
-                  {datePickerField === "start" ? (
-                    <DateTimePicker
-                      value={parseYmd(newStartDate) ?? new Date()}
-                      mode="date"
-                      display={Platform.OS === "ios" ? "inline" : "default"}
-                      maximumDate={parseYmd(newEndDate) ?? undefined}
-                      onChange={(e, d) => onDateChange("start", e, d)}
-                    />
-                  ) : null}
-                </View>
-                <View style={styles.field}>
-                  <Text style={styles.label}>End date</Text>
-                  <Pressable
-                    style={styles.dateButton}
-                    onPress={() => setDatePickerField("end")}
-                  >
-                    <Text
-                      style={
-                        newEndDate ? styles.dateValue : styles.datePlaceholder
-                      }
-                    >
-                      {newEndDate
-                        ? formatDisplayYmd(newEndDate)
-                        : "Select end date"}
-                    </Text>
-                    <Text style={styles.dateChevron}>▼</Text>
-                  </Pressable>
-                  {datePickerField === "end" ? (
-                    <DateTimePicker
-                      value={
-                        parseYmd(newEndDate) ??
-                        parseYmd(newStartDate) ??
-                        new Date()
-                      }
-                      mode="date"
-                      display={Platform.OS === "ios" ? "inline" : "default"}
-                      minimumDate={parseYmd(newStartDate) ?? undefined}
-                      onChange={(e, d) => onDateChange("end", e, d)}
-                    />
-                  ) : null}
-                </View>
-                {datePickerField !== null && Platform.OS === "ios" ? (
-                  <Pressable
-                    style={styles.dateDoneBtn}
-                    onPress={() => setDatePickerField(null)}
-                  >
-                    <Text style={styles.dateDoneText}>Done</Text>
-                  </Pressable>
-                ) : null}
-                {createFormError ? (
-                  <Text style={styles.error}>{createFormError}</Text>
-                ) : null}
-                <View style={styles.row}>
-                  <Pressable
-                    style={styles.secondaryBtn}
-                    onPress={() => {
-                      setDatePickerField(null);
-                      setView("select");
-                    }}
-                  >
-                    <Text style={styles.secondaryBtnText}>Back</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.primaryBtn, pending && styles.btnDisabled]}
-                    onPress={() => void handleCreate()}
-                    disabled={pending}
-                  >
-                    <Text style={styles.primaryBtnText}>
-                      {pending ? "Creating…" : "Create plan"}
-                    </Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
+                  )}
 
-            <Pressable style={styles.cancelWrap} onPress={handleClose}>
-              <Text style={styles.cancel}>Cancel</Text>
-            </Pressable>
+                  {loadingTrips ? (
+                    <ActivityIndicator style={styles.loader} color="#0f766e" />
+                  ) : null}
+                  {loadError ? (
+                    <Text style={styles.error}>{loadError}</Text>
+                  ) : null}
+                  {!loadingTrips && itineraries.length === 0 ? (
+                    <Text style={styles.hint}>You have no trips yet.</Text>
+                  ) : null}
+
+                  {itineraries.map((itin) => (
+                    <Pressable
+                      key={itin.id}
+                      style={[
+                        styles.planRow,
+                        selectedTripId === itin.id && styles.planRowSelected,
+                      ]}
+                      onPress={() => setSelectedTripId(itin.id)}
+                    >
+                      <Text style={styles.planName}>{itin.name}</Text>
+                      <Text style={styles.planDates}>
+                        {new Date(itin.start_date).toLocaleDateString("en-GB")}{" "}
+                        → {new Date(itin.end_date).toLocaleDateString("en-GB")}
+                      </Text>
+                    </Pressable>
+                  ))}
+
+                  {selectedTripId ? (
+                    <View style={styles.field}>
+                      <Text style={styles.label}>Day number</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={dayIndex}
+                        onChangeText={setDayIndex}
+                        keyboardType="number-pad"
+                        placeholder="1"
+                      />
+                    </View>
+                  ) : null}
+
+                  <View style={styles.row}>
+                    <Pressable
+                      style={styles.secondaryBtn}
+                      onPress={() => {
+                        setDatePickerField(null);
+                        setView("create");
+                      }}
+                    >
+                      <Text style={styles.secondaryBtnText}>+ New trip</Text>
+                    </Pressable>
+                    {selectedTripId ? (
+                      <Pressable
+                        style={[
+                          styles.primaryBtn,
+                          pending && styles.btnDisabled,
+                        ]}
+                        onPress={() => void handleAddEvent()}
+                        disabled={pending}
+                      >
+                        <Text style={styles.primaryBtnText}>
+                          {pending ? "Adding…" : "Add to trip"}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.title}>Create a new trip</Text>
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Trip name</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={newTripName}
+                      onChangeText={(t) => {
+                        setNewTripName(t);
+                        setCreateFormError(null);
+                      }}
+                      placeholder="My Edinburgh trip"
+                    />
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Start date</Text>
+                    <Pressable
+                      style={styles.dateButton}
+                      onPress={() => setDatePickerField("start")}
+                    >
+                      <Text
+                        style={
+                          newStartDate
+                            ? styles.dateValue
+                            : styles.datePlaceholder
+                        }
+                      >
+                        {newStartDate
+                          ? formatDisplayYmd(newStartDate)
+                          : "Select start date"}
+                      </Text>
+                      <Text style={styles.dateChevron}>▼</Text>
+                    </Pressable>
+                    {datePickerField === "start" ? (
+                      <DateTimePicker
+                        value={parseYmd(newStartDate) ?? new Date()}
+                        mode="date"
+                        display={Platform.OS === "ios" ? "inline" : "default"}
+                        maximumDate={parseYmd(newEndDate) ?? undefined}
+                        onChange={(e, d) => onDateChange("start", e, d)}
+                      />
+                    ) : null}
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={styles.label}>End date</Text>
+                    <Pressable
+                      style={styles.dateButton}
+                      onPress={() => setDatePickerField("end")}
+                    >
+                      <Text
+                        style={
+                          newEndDate ? styles.dateValue : styles.datePlaceholder
+                        }
+                      >
+                        {newEndDate
+                          ? formatDisplayYmd(newEndDate)
+                          : "Select end date"}
+                      </Text>
+                      <Text style={styles.dateChevron}>▼</Text>
+                    </Pressable>
+                    {datePickerField === "end" ? (
+                      <DateTimePicker
+                        value={
+                          parseYmd(newEndDate) ??
+                          parseYmd(newStartDate) ??
+                          new Date()
+                        }
+                        mode="date"
+                        display={Platform.OS === "ios" ? "inline" : "default"}
+                        minimumDate={parseYmd(newStartDate) ?? undefined}
+                        onChange={(e, d) => onDateChange("end", e, d)}
+                      />
+                    ) : null}
+                  </View>
+                  {datePickerField !== null && Platform.OS === "ios" ? (
+                    <Pressable
+                      style={styles.dateDoneBtn}
+                      onPress={() => setDatePickerField(null)}
+                    >
+                      <Text style={styles.dateDoneText}>Done</Text>
+                    </Pressable>
+                  ) : null}
+                  {createFormError ? (
+                    <Text style={styles.error}>{createFormError}</Text>
+                  ) : null}
+                  <View style={styles.row}>
+                    <Pressable
+                      style={styles.secondaryBtn}
+                      onPress={() => {
+                        setDatePickerField(null);
+                        setView(mode === "custom" ? "custom-form" : "select");
+                      }}
+                    >
+                      <Text style={styles.secondaryBtnText}>Back</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.primaryBtn, pending && styles.btnDisabled]}
+                      onPress={() => void handleCreate()}
+                      disabled={pending}
+                    >
+                      <Text style={styles.primaryBtnText}>
+                        {pending ? "Creating…" : "Create trip"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </>
+              )}
+
+              <Pressable style={styles.cancelWrap} onPress={handleClose}>
+                <Text style={styles.cancel}>Cancel</Text>
+              </Pressable>
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -448,9 +732,7 @@ export function AddToPlanModal({
 }
 
 const styles = StyleSheet.create({
-  kav: {
-    flex: 1,
-  },
+  kav: { flex: 1 },
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
@@ -463,26 +745,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 8,
-    maxHeight: "88%",
+    maxHeight: "90%",
   },
-  /** Leave room above the keyboard so the sheet does not fill under it. */
-  sheetKeyboardOpen: {
-    maxHeight: "72%",
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#111827",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 16,
-  },
+  sheetKeyboardOpen: { maxHeight: "72%" },
+  scrollContent: { flexGrow: 1 },
+  title: { fontSize: 20, fontWeight: "600", color: "#111827", marginBottom: 4 },
+  subtitle: { fontSize: 14, color: "#6b7280", marginBottom: 16 },
   loader: { marginVertical: 16 },
   hint: { fontSize: 14, color: "#9ca3af", marginBottom: 12 },
   error: { fontSize: 14, color: "#b91c1c", marginBottom: 8 },
@@ -493,19 +761,11 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-  planRowSelected: {
-    borderColor: "#0f766e",
-    backgroundColor: "#f0fdfa",
-  },
+  planRowSelected: { borderColor: "#0f766e", backgroundColor: "#f0fdfa" },
   planName: { fontSize: 15, fontWeight: "600", color: "#111827" },
   planDates: { fontSize: 12, color: "#9ca3af", marginTop: 4 },
   field: { marginBottom: 12 },
-  label: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#374151",
-    marginBottom: 6,
-  },
+  label: { fontSize: 13, fontWeight: "500", color: "#374151", marginBottom: 6 },
   input: {
     borderWidth: 1,
     borderColor: "#e5e7eb",
@@ -526,20 +786,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: "#fff",
   },
-  dateValue: {
-    fontSize: 16,
-    color: "#111827",
-    fontWeight: "500",
-  },
-  datePlaceholder: {
-    fontSize: 16,
-    color: "#9ca3af",
-  },
-  dateChevron: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginLeft: 8,
-  },
+  dateValue: { fontSize: 16, color: "#111827", fontWeight: "500" },
+  datePlaceholder: { fontSize: 16, color: "#9ca3af" },
+  dateChevron: { fontSize: 12, color: "#6b7280", marginLeft: 8 },
   dateDoneBtn: {
     alignSelf: "stretch",
     alignItems: "center",
@@ -550,17 +799,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#99f6e4",
   },
-  dateDoneText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#0f766e",
-  },
-  row: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 8,
-    flexWrap: "wrap",
-  },
+  dateDoneText: { fontSize: 16, fontWeight: "600", color: "#0f766e" },
+  row: { flexDirection: "row", gap: 10, marginTop: 8, flexWrap: "wrap" },
   secondaryBtn: {
     flex: 1,
     minWidth: 120,

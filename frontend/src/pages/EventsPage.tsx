@@ -4,7 +4,7 @@ import { getEvents } from "../api/events";
 import type { Event, EventCategory } from "../types/event";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { Button } from "../components/Button";
-import AddToPlanModal from "../components/AddToPlanModal";
+import AddToTripModal from "../components/AddToTripModal";
 import EventDetailModal from "../components/EventDetailModal";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -181,7 +181,7 @@ const EventsPage = () => {
       )}
 
       {selectedEvent && (
-        <AddToPlanModal
+        <AddToTripModal
           event={selectedEvent}
           onClose={() => setSelectedEvent(undefined)}
         />

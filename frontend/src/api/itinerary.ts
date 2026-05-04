@@ -1,5 +1,5 @@
 import client from "./clients";
-import type { Itinerary, ItineraryCreate, ItineraryItemCreate  } from "../types/itinerary";
+import type { Itinerary, ItineraryCreate, ItineraryItemCreate } from "../types/itinerary";
 
 export const createItinerary = async (data: ItineraryCreate): Promise<Itinerary> => {
     const response = await client.post<Itinerary>("/itineraries", data);
