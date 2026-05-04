@@ -25,3 +25,17 @@ export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   }
   return children;
 };
+
+export const UserOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isAdmin, isLoading } = useAuth();
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (isAdmin) {
+    return <Navigate to="/admin" replace />;
+  }
+  return children;
+};

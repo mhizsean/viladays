@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getEvents } from "../api/events";
 import type { Event, EventCategory } from "../types/event";
-import { EVENT_CATEGORIES } from "../constants/eventCategories";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { Button } from "../components/Button";
 import AddToPlanModal from "../components/AddToPlanModal";
+import EventDetailModal from "../components/EventDetailModal";
+import { useAuth } from "../contexts/AuthContext";
 
 const CATEGORY_CHIP: Record<EventCategory, { bg: string; text: string }> = {
   culture: { bg: "bg-blue-50", text: "text-blue-700" },
@@ -41,10 +42,14 @@ function categoryChipClass(category: EventCategory): string {
 
 function EventCard({
   event,
+  onView,
   onAddToPlan,
+  showAddToPlan,
 }: {
   event: Event;
+  onView: () => void;
   onAddToPlan: () => void;
+  showAddToPlan: boolean;
 }) {
   return (
     <div className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-gray-300 transition-colors">
@@ -70,27 +75,51 @@ function EventCard({
         <p className="text-xs text-gray-400 mb-4">
           {formatEventCardWhen(event.start_datetime)}
         </p>
-        <Button
-          variant="outline"
-          fullWidth
-          text="+ Add to plan"
-          onClick={onAddToPlan}
-        />
+        <div className={`flex gap-2 ${showAddToPlan ? "" : ""}`}>
+          <Button variant="outline" fullWidth text="View" onClick={onView} />
+          {showAddToPlan && (
+            <Button
+              variant="outline"
+              fullWidth
+              text="+ Add to plan"
+              onClick={onAddToPlan}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 const EventsPage = () => {
+  const { isAdmin } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<
     EventCategory | undefined
   >();
+  const [viewingEvent, setViewingEvent] = useState<Event | undefined>();
   const [selectedEvent, setSelectedEvent] = useState<Event | undefined>();
 
-  const { data: events, isLoading, isError } = useQuery({
-    queryKey: ["events", selectedCategory],
-    queryFn: () => getEvents({ category: selectedCategory }),
+  const {
+    data: allEvents,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["events"],
+    queryFn: () => getEvents(),
   });
+
+  const availableCategories = useMemo<EventCategory[]>(() => {
+    if (!allEvents) return [];
+    const seen = new Set<EventCategory>();
+    for (const e of allEvents) seen.add(e.category);
+    return Array.from(seen);
+  }, [allEvents]);
+
+  const events = useMemo(() => {
+    if (!allEvents) return [];
+    if (!selectedCategory) return allEvents;
+    return allEvents.filter((e) => e.category === selectedCategory);
+  }, [allEvents, selectedCategory]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -103,7 +132,7 @@ const EventsPage = () => {
 
       <CategoryFilter<EventCategory>
         className="mb-8"
-        categories={EVENT_CATEGORIES}
+        categories={availableCategories}
         value={selectedCategory}
         onChange={setSelectedCategory}
         allLabel="All"
@@ -120,22 +149,35 @@ const EventsPage = () => {
         </div>
       )}
 
-      {events && events.length === 0 && (
+      {!isLoading && events.length === 0 && (
         <div className="text-center text-gray-400 py-20">
           No events found for this category.
         </div>
       )}
 
-      {events && events.length > 0 && (
+      {events.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {events.map((event) => (
             <EventCard
               key={event.id}
               event={event}
+              showAddToPlan={!isAdmin}
+              onView={() => setViewingEvent(event)}
               onAddToPlan={() => setSelectedEvent(event)}
             />
           ))}
         </div>
+      )}
+
+      {viewingEvent && (
+        <EventDetailModal
+          event={viewingEvent}
+          onClose={() => setViewingEvent(undefined)}
+          onAddToPlan={() => {
+            setSelectedEvent(viewingEvent);
+            setViewingEvent(undefined);
+          }}
+        />
       )}
 
       {selectedEvent && (

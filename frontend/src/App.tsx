@@ -2,7 +2,7 @@ import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
-import { AdminRoute, ProtectedRoute } from "./components/ProtectedRoute";
+import { AdminRoute, ProtectedRoute, UserOnlyRoute } from "./components/ProtectedRoute";
 import EventsPage from "./pages/EventsPage";
 import ItineraryPage from "./pages/ItineraryPage";
 import { Layout } from "./components/Layout";
@@ -28,21 +28,21 @@ const App = () => {
         <Route
           path="/my-plan"
           element={
-            <ProtectedRoute>
+            <UserOnlyRoute>
               <Layout>
                 <ItineraryPage />
               </Layout>
-            </ProtectedRoute>
+            </UserOnlyRoute>
           }
         />
         <Route
           path="/calendar"
           element={
-            <ProtectedRoute>
+            <UserOnlyRoute>
               <Layout>
                 <CalendarPage />
               </Layout>
-            </ProtectedRoute>
+            </UserOnlyRoute>
           }
         />
         <Route

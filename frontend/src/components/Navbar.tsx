@@ -46,15 +46,27 @@ const Navbar = () => {
           <NavLink to="/" end className={navPillClass} onClick={closeMenu}>
             Explore
           </NavLink>
-          <NavLink to="/my-plan" className={navPillClass} onClick={closeMenu}>
-            My plan
-          </NavLink>
-          <NavLink to="/calendar" className={navPillClass} onClick={closeMenu}>
-            Calendar
-          </NavLink>
+          {!isAdmin && (
+            <>
+              <NavLink
+                to="/my-plan"
+                className={navPillClass}
+                onClick={closeMenu}
+              >
+                My plan
+              </NavLink>
+              <NavLink
+                to="/calendar"
+                className={navPillClass}
+                onClick={closeMenu}
+              >
+                Calendar
+              </NavLink>
+            </>
+          )}
           {isAdmin && (
             <NavLink to="/admin" className={navPillClass} onClick={closeMenu}>
-              Admin
+              Create
             </NavLink>
           )}
         </div>
