@@ -1,0 +1,12 @@
+import { api } from "./client";
+import type { LoginRequest, TokenResponse, User } from "../types/auth";
+
+export async function login(data: LoginRequest): Promise<TokenResponse> {
+  const response = await api.post<TokenResponse>("/auth/login", data);
+  return response.data;
+}
+
+export async function getMe(): Promise<User> {
+  const response = await api.get<User>("/auth/me");
+  return response.data;
+}

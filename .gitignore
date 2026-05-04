@@ -17,6 +17,12 @@ frontend/.env
 # Node
 frontend/node_modules/
 frontend/dist/
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+
+# Mobile local env (copy from mobile/.env.example)
+mobile/.env
 
 # General
 .DS_Store
